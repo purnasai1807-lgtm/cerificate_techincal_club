@@ -934,11 +934,24 @@ def bulk_approve():
 def _render_certificate(item, template):
     if PdfReader is None or canvas is None:
         raise RuntimeError("Certificate rendering dependencies are not installed.")
+
+    # Never generate/send a certificate with an empty recipient name.
+    participant_name = str(item.get("participantName") or item.get("participant", {}).get("name") or "").strip()
+    if not participant_name:
+        raise RuntimeError("Participant name is empty; certificate generation was stopped.")
+
     stored_template = db.load_file(f"template:{template['id']}")
     if not stored_template:
         raise RuntimeError("Template file not found.")
     source = io.BytesIO(stored_template["data"])
     fields = template.get("fields") or []
+    normalized_field_keys = set()
+    for f in fields:
+        raw_key = f.get("key") or f.get("fieldKey") or ""
+        k = str(raw_key).strip().upper().replace("{{", "").replace("}}", "")
+        normalized_field_keys.add({"FULL_NAME": "NAME", "PARTICIPANT_NAME": "NAME", "STUDENTNAME": "NAME"}.get(k, k))
+    if "NAME" not in normalized_field_keys:
+        raise RuntimeError("Certificate template has no Participant Name field. Open Template Editor, add 'Participant Name', position it, and save before generating.")
     font_map = {
         "Cinzel": "Helvetica-Bold",
         "Playfair Display": "Times-Roman",
@@ -963,13 +976,16 @@ def _render_certificate(item, template):
         height = float(page.mediabox.height)
         packet = io.BytesIO()
         overlay = canvas.Canvas(packet, pagesize=(width, height))
-        values = {"NAME": item["participantName"], "EMAIL": item["participantEmail"],
-                  "STUDENT_ID": item["participantStudentId"], "ROLL_NO": item["participantRollNumber"],
-                  "EVENT_NAME": item["eventName"], "DATE": item["issueDate"], "CERTIFICATE_ID": item["certificateId"]}
+        values = {"NAME": participant_name, "EMAIL": str(item.get("participantEmail") or ""),
+                  "STUDENT_ID": str(item.get("participantStudentId") or ""), "ROLL_NO": str(item.get("participantRollNumber") or ""),
+                  "EVENT_NAME": str(item.get("eventName") or ""), "DATE": str(item.get("issueDate") or ""), "CERTIFICATE_ID": str(item.get("certificateId") or "")}
         for field in fields:
             if field.get("visible", True) is False:
                 continue
-            key = field.get("key") or field.get("fieldKey")
+            raw_key = field.get("key") or field.get("fieldKey") or ""
+            key = str(raw_key).strip().upper().replace("{{", "").replace("}}", "")
+            aliases = {"FULL_NAME": "NAME", "PARTICIPANT_NAME": "NAME", "STUDENTNAME": "NAME", "ROLLNUMBER": "ROLL_NO", "STUDENTID": "STUDENT_ID", "EVENT": "EVENT_NAME", "CERTIFICATEID": "CERTIFICATE_ID"}
+            key = aliases.get(key, key)
             value = values.get(key, "")
             x, y = float(field.get("x", field.get("xPercent", 50))) / 100 * width, (100 - float(field.get("y", field.get("yPercent", 50)))) / 100 * height
             overlay.setFillColor(field.get("color", "#111827"))
@@ -1005,11 +1021,14 @@ def _render_certificate(item, template):
         packet = io.BytesIO()
         overlay = canvas.Canvas(packet, pagesize=(842, 595))
         overlay.drawImage(ImageReader(source), 0, 0, width=842, height=595)
-        values = {"NAME": item["participantName"], "EMAIL": item["participantEmail"], "STUDENT_ID": item["participantStudentId"], "ROLL_NO": item["participantRollNumber"], "EVENT_NAME": item["eventName"], "DATE": item["issueDate"], "CERTIFICATE_ID": item["certificateId"]}
+        values = {"NAME": participant_name, "EMAIL": str(item.get("participantEmail") or ""), "STUDENT_ID": str(item.get("participantStudentId") or ""), "ROLL_NO": str(item.get("participantRollNumber") or ""), "EVENT_NAME": str(item.get("eventName") or ""), "DATE": str(item.get("issueDate") or ""), "CERTIFICATE_ID": str(item.get("certificateId") or "")}
         for field in fields:
             if field.get("visible", True) is False:
                 continue
-            key = field.get("key") or field.get("fieldKey")
+            raw_key = field.get("key") or field.get("fieldKey") or ""
+            key = str(raw_key).strip().upper().replace("{{", "").replace("}}", "")
+            aliases = {"FULL_NAME": "NAME", "PARTICIPANT_NAME": "NAME", "STUDENTNAME": "NAME", "ROLLNUMBER": "ROLL_NO", "STUDENTID": "STUDENT_ID", "EVENT": "EVENT_NAME", "CERTIFICATEID": "CERTIFICATE_ID"}
+            key = aliases.get(key, key)
             x, y = float(field.get("x", field.get("xPercent", 50))) / 100 * 842, (100 - float(field.get("y", field.get("yPercent", 50)))) / 100 * 595
             overlay.setFillColor(field.get("color", "#111827"))
             base_font = font_map.get(field.get("fontFamily"), "Helvetica")

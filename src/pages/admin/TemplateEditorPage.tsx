@@ -129,6 +129,10 @@ export const TemplateEditorPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!template) return;
+    if (!template.fields.some((f) => f.fieldKey === 'NAME')) {
+      showToast('error', 'Participant Name is required', 'Add the Participant Name field, position it on the certificate, and save before sending certificates.');
+      return;
+    }
     setIsSaving(true);
     try {
       const res = await templatesService.updateTemplateFields(template.id, template.fields);
