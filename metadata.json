@@ -1,0 +1,8 @@
+{
+  "name": "Synapse Club × WiDS Technical Events Platform",
+  "description": "Full-stack event registration and management platform for Synapse Club and WiDS ACEEC technical events, workshops, hackathons, and seminars.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

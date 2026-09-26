@@ -1,0 +1,29 @@
+{
+  "certificatePortal": {
+    "imports": [],
+    "participants": [],
+    "templates": [],
+    "certificates": [],
+    "emailJobs": [],
+    "auditLogs": [],
+    "settings": {
+      "eventName": "",
+      "organizationName": "",
+      "certificateIdPrefix": "CERT",
+      "issueDate": "",
+      "activeTemplateId": "",
+      "requireCheckIn": true,
+      "requireCheckOut": true,
+      "senderName": "",
+      "replyToAddress": "",
+      "emailSubject": "Your certificate",
+      "emailBodyTemplate": ""
+    }
+  },
+  "legacyApp": {
+    "users": [],
+    "events": [],
+    "registrations": [],
+    "notifications": []
+  }
+}

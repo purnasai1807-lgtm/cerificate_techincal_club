@@ -1,0 +1,9 @@
+Flask>=3.0,<4
+flask-cors>=4.0,<7
+python-dotenv>=1.0,<2
+psycopg2-binary>=2.9,<3
+pypdf>=5.0,<6
+reportlab>=4.0,<5
+Pillow>=10.0,<12
+gunicorn>=23.0,<24
+requests>=2.31,<3
