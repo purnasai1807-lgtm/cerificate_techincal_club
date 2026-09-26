@@ -391,7 +391,7 @@ export const TemplateEditorPage: React.FC = () => {
                     max="100"
                     step="0.1"
                     value={currentField.xPercent}
-                    onChange={(e) => handleUpdateFieldProperty('xPercent', Number(e.target.value))}
+                    onChange={(e) => handleUpdateFieldProperty('xPercent', Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
                     className="w-20 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"
                   />
                   <input
@@ -401,7 +401,7 @@ export const TemplateEditorPage: React.FC = () => {
                     max="100"
                     step="0.1"
                     value={currentField.xPercent}
-                    onChange={(e) => handleUpdateFieldProperty('xPercent', Number(e.target.value))}
+                    onChange={(e) => handleUpdateFieldProperty('xPercent', Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
                     className="flex-1 accent-purple-600"
                   />
                 </div>
@@ -418,7 +418,7 @@ export const TemplateEditorPage: React.FC = () => {
                     max="100"
                     step="0.1"
                     value={currentField.yPercent}
-                    onChange={(e) => handleUpdateFieldProperty('yPercent', Number(e.target.value))}
+                    onChange={(e) => handleUpdateFieldProperty('yPercent', Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
                     className="w-20 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"
                   />
                   <input
@@ -428,7 +428,7 @@ export const TemplateEditorPage: React.FC = () => {
                     max="100"
                     step="0.1"
                     value={currentField.yPercent}
-                    onChange={(e) => handleUpdateFieldProperty('yPercent', Number(e.target.value))}
+                    onChange={(e) => handleUpdateFieldProperty('yPercent', Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
                     className="flex-1 accent-purple-600"
                   />
                 </div>
@@ -449,7 +449,7 @@ export const TemplateEditorPage: React.FC = () => {
                       max="200"
                       step="1"
                       value={currentField.fontSize}
-                      onChange={(e) => handleUpdateFieldProperty('fontSize', Number(e.target.value))}
+                      onChange={(e) => handleUpdateFieldProperty('fontSize', Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
                       className="w-20 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"
                     />
                     <input
@@ -458,7 +458,7 @@ export const TemplateEditorPage: React.FC = () => {
                       min="1"
                       max="200"
                       value={currentField.fontSize}
-                      onChange={(e) => handleUpdateFieldProperty('fontSize', Number(e.target.value))}
+                      onChange={(e) => handleUpdateFieldProperty('fontSize', Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
                       className="flex-1 accent-purple-600"
                     />
                   </div>

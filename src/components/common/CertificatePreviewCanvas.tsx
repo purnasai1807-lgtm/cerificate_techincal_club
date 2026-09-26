@@ -199,7 +199,8 @@ export const CertificatePreviewCanvas: React.FC<CertificatePreviewCanvasProps> =
                     ? 'translate(-100%, -50%)'
                     : 'translate(0, -50%)',
                 fontSize: `${field.fontSize * 0.75}px`,
-                fontWeight: field.fontWeight,
+                fontWeight: field.fontWeight === 'semibold' ? 600 : field.fontWeight === 'medium' ? 500 : field.fontWeight === 'bold' ? 700 : 400,
+                fontStyle: field.fontStyle === 'italic' || field.fontStyle === 'bold italic' ? 'italic' : 'normal',
                 fontFamily: field.fontFamily,
                 color: field.color,
                 textAlign: field.textAlign,

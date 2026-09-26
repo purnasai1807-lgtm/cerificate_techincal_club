@@ -1084,12 +1084,29 @@ def _render_certificate(item, template):
             x, y = float(field.get("xPercent", field.get("x", 50))) / 100 * width, (100 - float(field.get("yPercent", field.get("y", 50)))) / 100 * height
             overlay.setFillColor(field.get("color", "#111827"))
             base_font = font_map.get(field.get("fontFamily"), "Helvetica")
-            style = field.get("fontStyle", "normal")
-            font_name = base_font + style_map.get(style, "")
-            if font_name not in ("Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique",
-                                 "Times-Roman", "Times-Italic", "Times-Bold", "Times-BoldItalic"):
+            style = str(field.get("fontStyle") or "normal").lower()
+            weight = str(field.get("fontWeight") or "normal").lower()
+            if base_font == "Helvetica":
+                if style == "bold italic" or (weight == "bold" and style == "italic"):
+                    font_name = "Helvetica-BoldOblique"
+                elif style == "italic":
+                    font_name = "Helvetica-Oblique"
+                elif weight in ("bold", "semibold"):
+                    font_name = "Helvetica-Bold"
+                else:
+                    font_name = "Helvetica"
+            elif base_font == "Times-Roman":
+                if style == "bold italic" or (weight == "bold" and style == "italic"):
+                    font_name = "Times-BoldItalic"
+                elif style == "italic":
+                    font_name = "Times-Italic"
+                elif weight in ("bold", "semibold"):
+                    font_name = "Times-Bold"
+                else:
+                    font_name = "Times-Roman"
+            else:
                 font_name = base_font
-            overlay.setFont(font_name, float(field.get("fontSize", 24)))
+            overlay.setFont(font_name, max(1, float(field.get("fontSize", 24))))
             alignment = field.get("textAlign", "center")
             if alignment == "left":
                 overlay.drawString(x, y, value)
@@ -1126,12 +1143,29 @@ def _render_certificate(item, template):
             x, y = float(field.get("xPercent", field.get("x", 50))) / 100 * 842, (100 - float(field.get("yPercent", field.get("y", 50)))) / 100 * 595
             overlay.setFillColor(field.get("color", "#111827"))
             base_font = font_map.get(field.get("fontFamily"), "Helvetica")
-            style = field.get("fontStyle", "normal")
-            font_name = base_font + style_map.get(style, "")
-            if font_name not in ("Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique",
-                                 "Times-Roman", "Times-Italic", "Times-Bold", "Times-BoldItalic"):
+            style = str(field.get("fontStyle") or "normal").lower()
+            weight = str(field.get("fontWeight") or "normal").lower()
+            if base_font == "Helvetica":
+                if style == "bold italic" or (weight == "bold" and style == "italic"):
+                    font_name = "Helvetica-BoldOblique"
+                elif style == "italic":
+                    font_name = "Helvetica-Oblique"
+                elif weight in ("bold", "semibold"):
+                    font_name = "Helvetica-Bold"
+                else:
+                    font_name = "Helvetica"
+            elif base_font == "Times-Roman":
+                if style == "bold italic" or (weight == "bold" and style == "italic"):
+                    font_name = "Times-BoldItalic"
+                elif style == "italic":
+                    font_name = "Times-Italic"
+                elif weight in ("bold", "semibold"):
+                    font_name = "Times-Bold"
+                else:
+                    font_name = "Times-Roman"
+            else:
                 font_name = base_font
-            overlay.setFont(font_name, float(field.get("fontSize", 24)))
+            overlay.setFont(font_name, max(1, float(field.get("fontSize", 24))))
             alignment = field.get("textAlign", "center")
             value = values.get(key, "")
             if alignment == "left":
@@ -1198,11 +1232,18 @@ def job_file(job_id):
 def _render_email_content(item):
     """Render the exact subject/body that will be sent and logged."""
     settings = portal_state["settings"]
+    participant = item.get("participant") if isinstance(item.get("participant"), dict) else {}
+    name = str(item.get("participantName") or participant.get("name") or "").strip()
+    email = str(item.get("participantEmail") or participant.get("email") or "").strip()
+    student_id = str(item.get("participantStudentId") or participant.get("studentId") or "").strip()
+    roll_no = str(item.get("participantRollNumber") or participant.get("rollNumber") or "").strip()
     values = {
-        "{{NAME}}": str(item.get("participantName") or ""),
-        "{{EMAIL}}": str(item.get("participantEmail") or ""),
-        "{{STUDENT_ID}}": str(item.get("participantStudentId") or ""),
-        "{{ROLL_NO}}": str(item.get("participantRollNumber") or ""),
+        "{{NAME}}": name,
+        "{{PARTICIPANT_NAME}}": name,
+        "{{FULL_NAME}}": name,
+        "{{EMAIL}}": email,
+        "{{STUDENT_ID}}": student_id,
+        "{{ROLL_NO}}": roll_no,
         "{{EVENT_NAME}}": str(item.get("eventName") or settings.get("eventName") or ""),
         "{{DATE}}": str(item.get("issueDate") or ""),
         "{{CERTIFICATE_ID}}": str(item.get("certificateId") or ""),
@@ -1210,8 +1251,8 @@ def _render_email_content(item):
     subject = str(settings.get("emailSubject") or "Your certificate")
     body = str(settings.get("emailBodyTemplate") or "Your certificate is attached.")
     for token, value in values.items():
-        subject = subject.replace(token, value)
-        body = body.replace(token, value)
+        subject = subject.replace(token, value).replace(token.lower(), value)
+        body = body.replace(token, value).replace(token.lower(), value)
     return subject, body
 
 
