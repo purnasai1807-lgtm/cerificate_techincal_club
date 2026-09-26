@@ -101,7 +101,7 @@ export const ImportPage: React.FC = () => {
       if (uploadRes.success) {
         await loadHistory();
         showToast('success', 'File Uploaded', 'Attendance file uploaded and saved to the server. Opening schema mapper.');
-        navigate('/admin/import/preview');
+        navigate(`/admin/import/preview?importId=${encodeURIComponent(uploadRes.data?.importId || '')}`);
       }
     } catch {
       showToast('error', 'Analysis Failed', 'Could not process file structure. Please try again.');

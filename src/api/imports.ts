@@ -26,6 +26,8 @@ export interface ImportConfirmResponse {
   status: 'IMPORTED';
   participantsCreated: number;
   certificateRequestsCreated: number;
+  totalImportedRows?: number;
+  duplicatesSkipped?: number;
 }
 
 function normalizeHeader(value: string): string {
@@ -250,18 +252,16 @@ export const importsService = {
       body: formData,
     });
     if (response.success && response.data) {
-      // Persist only server-returned file metadata. Do not create placeholder
-      // participant rows or fake sample values in the browser.
-      const preview = await this.getImportPreview(response.data.importId);
-      const records = preview.success && preview.data ? preview.data.records : [];
-      const columns = preview.success && preview.data ? preview.data.columns : [];
-      saveStoredImportJob({
+      // Save the server-issued import id immediately. Preview loading must never
+      // be allowed to prevent the import from being recoverable after navigation,
+      // refresh, or a transient preview request failure.
+      const baseJob: ImportJob = {
         id: response.data.importId,
         filename: response.data.filename,
         fileType: response.data.fileType.toLowerCase() === 'pdf' ? 'pdf' : 'csv',
         fileSize: `${(file.size / 1024).toFixed(1)} KB`,
         uploadedAt: new Date().toISOString(),
-        totalRecords: records.length,
+        totalRecords: 0,
         validRecords: 0,
         invalidRecords: 0,
         duplicateRecords: 0,
@@ -272,10 +272,29 @@ export const importsService = {
         missingCheckIn: 0,
         missingCheckOut: 0,
         status: 'UPLOADED',
-        columns,
-        rawRows: records,
+        columns: [],
+        rawRows: [],
         records: [],
-      });
+      };
+      saveStoredImportJob(baseJob);
+
+      // Hydrate the preview when available, but keep the upload recoverable even
+      // if this request is temporarily unavailable. The backend remains the
+      // source of truth for the actual uploaded bytes and parsed rows.
+      try {
+        const preview = await this.getImportPreview(response.data.importId);
+        if (preview.success && preview.data) {
+          saveStoredImportJob({
+            ...baseJob,
+            columns: preview.data.columns,
+            rawRows: preview.data.records,
+            totalRecords: preview.data.records.length,
+          });
+        }
+      } catch {
+        // Intentionally ignore preview hydration errors here. The import id is
+        // already persisted and the preview page will retry from the backend.
+      }
     }
     return response;
   },
@@ -339,7 +358,12 @@ export const importsService = {
       method: 'POST',
       body: JSON.stringify({ importValidRecordsOnly }),
     });
-    if (response.success) saveStoredImportJob(null);
+    // Keep the server-issued import id available after confirmation so the
+    // completed import can still be reopened/downloaded from history.
+    if (response.success) {
+      const existing = getStoredImportJob();
+      if (existing) saveStoredImportJob({ ...existing, status: 'IMPORTED' });
+    }
     return response;
   },
 

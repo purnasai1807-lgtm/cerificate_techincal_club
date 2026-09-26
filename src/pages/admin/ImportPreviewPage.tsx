@@ -14,7 +14,7 @@ import {
   Info,
 } from 'lucide-react';
 import { ColumnMapping, ImportJob } from '../../types';
-import { getStoredImportJob, importsService } from '../../api/imports';
+import { getStoredImportJob, saveStoredImportJob, importsService } from '../../api/imports';
 import { Badge } from '../../components/common/Badge';
 import { useNotifications } from '../../context/NotificationContext';
 import confetti from 'canvas-confetti';
@@ -45,6 +45,7 @@ const buildDefaultMappings = (job: ImportJob): ColumnMapping[] => {
 
 export const ImportPreviewPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { showToast } = useNotifications();
   const [job, setJob] = useState<ImportJob | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,9 +60,29 @@ export const ImportPreviewPage: React.FC = () => {
     let cancelled = false;
 
     const loadUploadedData = async () => {
-      const stored = getStoredImportJob();
+      const requestedId = searchParams.get('importId');
+      let stored = getStoredImportJob();
+
+      // Recover from the backend when browser sessionStorage is empty (new tab,
+      // session restore, or a previous tab navigation). The server is the source
+      // of truth for uploaded imports.
+      if (requestedId) {
+        try {
+          const status = await importsService.getImportStatus(requestedId);
+          if (status.success && status.data) {
+            stored = status.data;
+            saveStoredImportJob(stored);
+          }
+        } catch {
+          // Fall through to the local/latest import recovery below.
+        }
+      }
       if (!stored?.id) {
-        showToast('error', 'No uploaded CSV found', 'Please upload the CSV again before previewing it.');
+        stored = await importsService.getLatestImport();
+        if (stored) saveStoredImportJob(stored);
+      }
+      if (!stored?.id) {
+        showToast('error', 'No uploaded CSV found', 'Upload a CSV first. No persisted upload is available on the server.');
         navigate('/admin/import');
         return;
       }
@@ -99,7 +120,7 @@ export const ImportPreviewPage: React.FC = () => {
 
     loadUploadedData();
     return () => { cancelled = true; };
-  }, [navigate, showToast]);
+  }, [navigate, showToast, searchParams]);
 
   const handleMappingChange = async (index: number, newField: ColumnMapping['mappedField']) => {
     if (!job) return;
@@ -127,7 +148,7 @@ export const ImportPreviewPage: React.FC = () => {
       const res = await importsService.commitImport(job.id);
       if (res.success) {
         confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
-        showToast('success', 'Import Committed', `${res.data.participantsCreated} eligible records imported.`);
+        showToast('success', 'Import Committed', `${res.data.participantsCreated} participant records saved. ${res.data.certificateRequestsCreated} eligible certificate requests created.`);
         navigate('/admin/participants');
       } else {
         showToast('error', 'Import Failed', res.error?.message || 'Failed to commit participant records to database.');
@@ -200,7 +221,7 @@ export const ImportPreviewPage: React.FC = () => {
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <span>Import Valid Records</span>
+                <span>Import All Records</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

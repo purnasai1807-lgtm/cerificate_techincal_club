@@ -483,9 +483,35 @@ def confirm_import(import_id):
     if job.get("status") == "IMPORTED":
         return _response({"importId": import_id, "status": "IMPORTED", "participantsCreated": 0,
                           "certificateRequestsCreated": 0})
-    records = job["records"] if not body.get("importValidRecordsOnly", True) else [r for r in job["records"] if not r["validationErrors"]]
-    existing = {p["id"] for p in portal_state["participants"]}
-    records = [r for r in records if r["id"] not in existing]
+    # Persist every real row from the uploaded file. Validation/eligibility only
+    # controls certificate creation; it must never silently discard imported data.
+    # The legacy flag is accepted for backwards compatibility but is intentionally
+    # ignored for participant persistence.
+    records = list(job.get("records") or [])
+
+    # Avoid creating duplicate participant rows when the same import is confirmed
+    # again or an identical file is uploaded twice. Match on stable real-world
+    # identifiers rather than the generated participant UUID.
+    existing_keys = set()
+    for participant in portal_state["participants"]:
+        for key in ("email", "rollNumber", "studentId"):
+            value = str(participant.get(key) or "").strip().lower()
+            if value:
+                existing_keys.add((key, value))
+
+    new_records = []
+    for record in records:
+        identity_keys = []
+        for key in ("email", "rollNumber", "studentId"):
+            value = str(record.get(key) or "").strip().lower()
+            if value:
+                identity_keys.append((key, value))
+        if identity_keys and any(key in existing_keys for key in identity_keys):
+            continue
+        new_records.append(record)
+        existing_keys.update(identity_keys)
+
+    records = new_records
     portal_state["participants"].extend(records)
     prefix = portal_state["settings"].get("certificateIdPrefix") or "CERT"
     active_template = portal_state["settings"].get("activeTemplateId")
@@ -503,9 +529,13 @@ def confirm_import(import_id):
                         "issueDate": portal_state["settings"]["issueDate"] or _now()[:10]})
     portal_state["certificates"].extend(created)
     job["status"] = "IMPORTED"
+    job["participantsPersisted"] = len(records)
+    job["certificateRequestsCreated"] = len(created)
     _save_state()
     return _response({"importId": import_id, "status": "IMPORTED", "participantsCreated": len(records),
-                      "certificateRequestsCreated": len(created)})
+                      "certificateRequestsCreated": len(created),
+                      "totalImportedRows": len(job.get("records") or []),
+                      "duplicatesSkipped": max(0, len(job.get("records") or []) - len(records))})
 
 
 @certificate_api.get("/participants")
