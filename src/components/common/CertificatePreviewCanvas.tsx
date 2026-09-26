@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CertificateTemplate, TemplateFieldConfig } from '../../types';
 import { Award, ShieldCheck, QrCode } from 'lucide-react';
 import { API_BASE_URL, getAuthToken } from '../../api/client';
@@ -16,6 +16,7 @@ interface CertificatePreviewCanvasProps {
   };
   selectedFieldId?: string | null;
   onSelectField?: (fieldId: string) => void;
+  onFieldPositionChange?: (fieldId: string, xPercent: number, yPercent: number) => void;
   interactive?: boolean;
 }
 
@@ -24,9 +25,12 @@ export const CertificatePreviewCanvas: React.FC<CertificatePreviewCanvasProps> =
   sampleData = {},
   selectedFieldId = null,
   onSelectField,
+  onFieldPositionChange,
   interactive = false,
 }) => {
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ fieldId: string; pointerId: number } | null>(null);
   const rawPreviewUrl = (template as CertificateTemplate & { previewUrl?: string }).previewUrl || template.fileUrl || '';
   const fileType = String(template.fileType || '').toLowerCase();
 
@@ -119,8 +123,17 @@ export const CertificatePreviewCanvas: React.FC<CertificatePreviewCanvasProps> =
     }
   };
 
+  const updateDraggedPosition = (fieldId: string, clientX: number, clientY: number) => {
+    if (!canvasRef.current || !onFieldPositionChange) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+    onFieldPositionChange(fieldId, Number(x.toFixed(2)), Number(y.toFixed(2)));
+  };
+
   return (
-    <div className="relative w-full aspect-[1.414/1] bg-white text-slate-900 rounded-lg shadow-2xl overflow-hidden border border-slate-300 select-none">
+    <div ref={canvasRef} className="relative w-full aspect-[1.414/1] bg-white text-slate-900 rounded-lg shadow-2xl overflow-hidden border border-slate-300 select-none">
       {previewBlobUrl && ['png', 'jpg', 'jpeg'].includes(fileType) && (
         <img
           src={previewBlobUrl}
@@ -148,10 +161,31 @@ export const CertificatePreviewCanvas: React.FC<CertificatePreviewCanvasProps> =
           return (
             <div
               key={field.id}
+              onPointerDown={(e) => {
+                if (!interactive) return;
+                e.stopPropagation();
+                onSelectField?.(field.id);
+                if (onFieldPositionChange) {
+                  dragRef.current = { fieldId: field.id, pointerId: e.pointerId };
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                }
+              }}
+              onPointerMove={(e) => {
+                if (!interactive || !dragRef.current || dragRef.current.fieldId !== field.id || dragRef.current.pointerId !== e.pointerId) return;
+                e.preventDefault();
+                updateDraggedPosition(field.id, e.clientX, e.clientY);
+              }}
+              onPointerUp={(e) => {
+                if (dragRef.current?.pointerId === e.pointerId) {
+                  dragRef.current = null;
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+                }
+              }}
+              onPointerCancel={() => { dragRef.current = null; }}
               onClick={(e) => {
-                if (interactive && onSelectField) {
+                if (interactive) {
                   e.stopPropagation();
-                  onSelectField(field.id);
+                  onSelectField?.(field.id);
                 }
               }}
               style={{
@@ -169,7 +203,8 @@ export const CertificatePreviewCanvas: React.FC<CertificatePreviewCanvasProps> =
                 fontFamily: field.fontFamily,
                 color: field.color,
                 textAlign: field.textAlign,
-                cursor: interactive ? 'pointer' : 'default',
+                cursor: interactive ? 'grab' : 'default',
+                touchAction: interactive ? 'none' : undefined,
               }}
               className={`transition-all ${
                 interactive

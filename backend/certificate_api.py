@@ -1081,7 +1081,7 @@ def _render_certificate(item, template):
             aliases = {"FULL_NAME": "NAME", "PARTICIPANT_NAME": "NAME", "STUDENTNAME": "NAME", "ROLLNUMBER": "ROLL_NO", "STUDENTID": "STUDENT_ID", "EVENT": "EVENT_NAME", "CERTIFICATEID": "CERTIFICATE_ID"}
             key = aliases.get(key, key)
             value = values.get(key, "")
-            x, y = float(field.get("x", field.get("xPercent", 50))) / 100 * width, (100 - float(field.get("y", field.get("yPercent", 50)))) / 100 * height
+            x, y = float(field.get("xPercent", field.get("x", 50))) / 100 * width, (100 - float(field.get("yPercent", field.get("y", 50)))) / 100 * height
             overlay.setFillColor(field.get("color", "#111827"))
             base_font = font_map.get(field.get("fontFamily"), "Helvetica")
             style = field.get("fontStyle", "normal")
@@ -1123,7 +1123,7 @@ def _render_certificate(item, template):
             key = str(raw_key).strip().upper().replace("{{", "").replace("}}", "")
             aliases = {"FULL_NAME": "NAME", "PARTICIPANT_NAME": "NAME", "STUDENTNAME": "NAME", "ROLLNUMBER": "ROLL_NO", "STUDENTID": "STUDENT_ID", "EVENT": "EVENT_NAME", "CERTIFICATEID": "CERTIFICATE_ID"}
             key = aliases.get(key, key)
-            x, y = float(field.get("x", field.get("xPercent", 50))) / 100 * 842, (100 - float(field.get("y", field.get("yPercent", 50)))) / 100 * 595
+            x, y = float(field.get("xPercent", field.get("x", 50))) / 100 * 842, (100 - float(field.get("yPercent", field.get("y", 50)))) / 100 * 595
             overlay.setFillColor(field.get("color", "#111827"))
             base_font = font_map.get(field.get("fontFamily"), "Helvetica")
             style = field.get("fontStyle", "normal")

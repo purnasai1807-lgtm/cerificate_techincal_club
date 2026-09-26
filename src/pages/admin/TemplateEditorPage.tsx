@@ -319,6 +319,17 @@ export const TemplateEditorPage: React.FC = () => {
               template={template}
               selectedFieldId={selectedFieldId}
               onSelectField={(id) => setSelectedFieldId(id)}
+              onFieldPositionChange={(id, xPercent, yPercent) => {
+                setTemplate((current) => {
+                  if (!current) return current;
+                  return {
+                    ...current,
+                    fields: current.fields.map((field) =>
+                      field.id === id ? { ...field, xPercent, yPercent } : field
+                    ),
+                  };
+                });
+              }}
               interactive={true}
               sampleData={{
                 name: sampleParticipant?.name || '',
