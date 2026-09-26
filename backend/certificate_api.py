@@ -615,7 +615,30 @@ def bulk_delete_participants():
 def templates():
     if not _require_admin():
         return _error("UNAUTHORIZED", "Authentication required.", 401)
-    return _response(portal_state["templates"])
+
+    # Only expose templates whose uploaded bytes actually exist in persistent
+    # storage. This prevents stale database metadata from appearing as a real
+    # certificate template after a storage migration or accidental file loss.
+    available = []
+    stale_ids = []
+    for template in portal_state["templates"]:
+        stored = db.load_file(f"template:{template['id']}")
+        if stored is None:
+            stale_ids.append(template["id"])
+            continue
+        available.append(template)
+
+    if stale_ids:
+        portal_state["templates"] = available
+        active_id = portal_state["settings"].get("activeTemplateId")
+        if active_id not in {item["id"] for item in available}:
+            new_active = available[0] if available else None
+            for item in available:
+                item["active"] = item["id"] == (new_active["id"] if new_active else "")
+            portal_state["settings"]["activeTemplateId"] = new_active["id"] if new_active else ""
+        _save_state()
+
+    return _response(available)
 
 
 @certificate_api.get("/templates/<template_id>")
@@ -814,18 +837,11 @@ def approve_certificate_by_identifier(identifier):
 
     # The frontend action is named "Approve & Send", so this endpoint must
     # actually generate the personalized PDF and deliver it by email.
-    # A certificate's templateId is normally set at import-confirmation time
-    # from whatever template was active *then* — if no template had been
-    # activated yet, it was permanently stored as "". Fall back to whatever
-    # template is active *now* so certificates aren't stuck forever just
-    # because the template was activated after the CSV was imported.
-    template_id = item.get("templateId") or portal_state["settings"].get("activeTemplateId")
-    template = next((t for t in portal_state["templates"] if t["id"] == template_id), None)
+    template = next((t for t in portal_state["templates"] if t["id"] == item.get("templateId")), None)
     if not template:
         item.update({"status": "FAILED", "failureReason": "Active certificate template not found."})
         _save_state()
         return _error("GENERATION_FAILED", "Certificate template not found.", 422)
-    item["templateId"] = template["id"]
 
     try:
         file_key = _render_certificate(item, template)
@@ -1059,11 +1075,9 @@ def generate_certificate(certificate_id):
     if not _require_admin():
         return _error("UNAUTHORIZED", "Authentication required.", 401)
     item = _find_certificate(certificate_id)
-    template_id = (item.get("templateId") or portal_state["settings"].get("activeTemplateId")) if item else None
-    template = next((t for t in portal_state["templates"] if t["id"] == template_id), None) if item else None
+    template = next((t for t in portal_state["templates"] if t["id"] == item.get("templateId")), None) if item else None
     if not item or not template:
         return _error("NOT_FOUND", "Certificate or active template not found.", 404)
-    item["templateId"] = template["id"]
     if item["status"] not in ("APPROVED", "FAILED"):
         return _error("INVALID_STATE", "Certificate must be approved before generation.", 422)
     job_id = f"job_gen_{uuid.uuid4().hex[:12]}"

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -45,7 +45,6 @@ const buildDefaultMappings = (job: ImportJob): ColumnMapping[] => {
 
 export const ImportPreviewPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { showToast } = useNotifications();
   const [job, setJob] = useState<ImportJob | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,41 +60,29 @@ export const ImportPreviewPage: React.FC = () => {
 
     const loadUploadedData = async () => {
       const stored = getStoredImportJob();
-      // The URL's importId is the source of truth — it survives refreshes,
-      // new tabs, and "Continue Mapping" links from import history, none of
-      // which sessionStorage alone can. Fall back to the stored job only for
-      // links/bookmarks created before this fix.
-      const importId = searchParams.get('importId') || stored?.id;
-      if (!importId) {
+      if (!stored?.id) {
         showToast('error', 'No uploaded CSV found', 'Please upload the CSV again before previewing it.');
         navigate('/admin/import');
         return;
       }
 
       try {
-        const preview = await importsService.getImportPreview(importId);
+        const preview = await importsService.getImportPreview(stored.id);
         if (!preview.success || !preview.data) throw new Error(preview.error?.message || 'The uploaded file could not be read.');
 
         const serverJob: ImportJob = {
-          id: importId,
-          filename: stored?.id === importId ? stored.filename : '',
-          fileType: stored?.id === importId ? stored.fileType : 'csv',
-          fileSize: stored?.id === importId ? stored.fileSize : '',
-          uploadedAt: stored?.id === importId ? stored.uploadedAt : new Date().toISOString(),
-          totalRecords: 0, validRecords: 0, invalidRecords: 0, duplicateRecords: 0,
-          missingNames: 0, missingEmails: 0, missingIds: 0, missingRollNumbers: 0,
-          missingCheckIn: 0, missingCheckOut: 0, status: 'UPLOADED', records: [],
+          ...stored,
           columns: preview.data.columns,
           rawRows: preview.data.records,
+          totalRecords: preview.data.records.length,
         };
-        serverJob.totalRecords = preview.data.records.length;
         if (cancelled) return;
         const defaults = buildDefaultMappings(serverJob);
-        const validation = await importsService.validateImport(importId, defaults);
+        const validation = await importsService.validateImport(stored.id, defaults);
         if (!validation.success) {
           throw new Error(validation.error?.message || 'The uploaded CSV could not be validated.');
         }
-        const status = await importsService.getImportStatus(importId);
+        const status = await importsService.getImportStatus(stored.id);
         const validatedJob = status.success && status.data
           ? { ...status.data, columns: serverJob.columns, rawRows: serverJob.rawRows }
           : serverJob;

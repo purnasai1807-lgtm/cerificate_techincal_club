@@ -15,7 +15,6 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronRight,
-  ChevronLeft,
   ShieldCheck,
   Download,
   FileDown,
@@ -57,14 +56,6 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Pagination state — the backend caps /certificates at `limit` (default 25,
-  // max 100) records per request, so we must page through results instead of
-  // assuming a single request returns everything.
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(100);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-
   // Modals state
   const [approveModalCert, setApproveModalCert] = useState<Certificate | null>(null);
   const [rejectModalCert, setRejectModalCert] = useState<Certificate | null>(null);
@@ -80,14 +71,10 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
     const res = await certificatesService.getCertificates({
       status: activeTab,
       search: searchQuery,
-      page,
-      limit: pageSize,
     });
     if (res.success) {
       setCertificates(res.data.items);
       setCounts(res.data.countsByStatus);
-      setTotalCount(res.data.total);
-      setTotalPages(res.data.pagination?.totalPages || 1);
     }
     setIsLoading(false);
   };
@@ -96,16 +83,9 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
     setActiveTab(getTabFromPath());
   }, [location.pathname]);
 
-  // Reset to page 1 whenever the tab or search changes, so we don't get
-  // stuck on an out-of-range page from a previous, larger filtered set.
-  // (Guarded so it doesn't also trigger a redundant extra fetch below.)
-  useEffect(() => {
-    setPage((p) => (p === 1 ? p : 1));
-  }, [activeTab, searchQuery]);
-
   useEffect(() => {
     fetchCertificates();
-  }, [activeTab, searchQuery, page]);
+  }, [activeTab, searchQuery]);
 
   // Computed selection sets
   const selectedCertificates = certificates.filter((c) => selectedIds.includes(c.id));
@@ -452,10 +432,7 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
             </span>
           </label>
           <span>•</span>
-          <span>
-            Showing {certificates.length === 0 ? 0 : (page - 1) * pageSize + 1}-
-            {Math.min(page * pageSize, totalCount)} of {totalCount} records
-          </span>
+          <span>Showing {certificates.length} records</span>
         </div>
       </div>
 
@@ -640,34 +617,6 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
         {certificates.length === 0 && !isLoading && (
           <div className="p-12 text-center text-slate-400 text-xs">
             No certificates found in the <span className="font-semibold">{activeTab}</span> category.
-          </div>
-        )}
-
-        {/* Pagination Toolbar — without this, anything past the first
-            `pageSize` records for the active tab was unreachable. */}
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <p className="text-xs text-slate-500">
-              Page <span className="font-bold text-slate-800 dark:text-slate-200">{page}</span> of{' '}
-              <span className="font-bold text-slate-800 dark:text-slate-200">{totalPages}</span>
-            </p>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
           </div>
         )}
       </div>

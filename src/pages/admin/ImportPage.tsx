@@ -101,7 +101,7 @@ export const ImportPage: React.FC = () => {
       if (uploadRes.success) {
         await loadHistory();
         showToast('success', 'File Uploaded', 'Attendance file uploaded and saved to the server. Opening schema mapper.');
-        navigate(`/admin/import/preview?importId=${encodeURIComponent(uploadRes.data.importId)}`);
+        navigate('/admin/import/preview');
       }
     } catch {
       showToast('error', 'Analysis Failed', 'Could not process file structure. Please try again.');
@@ -311,34 +311,23 @@ export const ImportPage: React.FC = () => {
                     Status: <span className="font-semibold">{job.status}</span>
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {job.status !== 'IMPORTED' && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/import/preview?importId=${encodeURIComponent(job.id)}`)}
-                      className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold text-center"
-                    >
-                      Continue Mapping
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={downloadingId === job.id}
-                    onClick={async () => {
-                      setDownloadingId(job.id);
-                      try {
-                        await importsService.downloadImportFile(job.id, job.filename);
-                      } catch (error: any) {
-                        showToast('error', 'Download Failed', error?.message || 'Could not download the saved file.');
-                      } finally {
-                        setDownloadingId(null);
-                      }
-                    }}
-                    className="shrink-0 px-3 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold text-center disabled:opacity-50"
-                  >
-                    {downloadingId === job.id ? 'Downloading...' : 'Download Original'}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={downloadingId === job.id}
+                  onClick={async () => {
+                    setDownloadingId(job.id);
+                    try {
+                      await importsService.downloadImportFile(job.id, job.filename);
+                    } catch (error: any) {
+                      showToast('error', 'Download Failed', error?.message || 'Could not download the saved file.');
+                    } finally {
+                      setDownloadingId(null);
+                    }
+                  }}
+                  className="shrink-0 px-3 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[11px] font-bold text-center disabled:opacity-50"
+                >
+                  {downloadingId === job.id ? 'Downloading...' : 'Download Original'}
+                </button>
               </div>
             ))}
           </div>

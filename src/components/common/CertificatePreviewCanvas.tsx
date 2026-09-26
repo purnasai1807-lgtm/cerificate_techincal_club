@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CertificateTemplate, TemplateFieldConfig } from '../../types';
 import { Award, ShieldCheck, QrCode } from 'lucide-react';
-import { getAuthToken } from '../../api/client';
+import { API_BASE_URL, getAuthToken } from '../../api/client';
 
 interface CertificatePreviewCanvasProps {
   template: CertificateTemplate;
@@ -27,8 +27,20 @@ export const CertificatePreviewCanvas: React.FC<CertificatePreviewCanvasProps> =
   interactive = false,
 }) => {
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
-  const uploadedPreviewUrl = (template as CertificateTemplate & { previewUrl?: string }).previewUrl || template.fileUrl || '';
+  const rawPreviewUrl = (template as CertificateTemplate & { previewUrl?: string }).previewUrl || template.fileUrl || '';
   const fileType = String(template.fileType || '').toLowerCase();
+
+  const resolvePreviewUrl = (value: string) => {
+    if (!value) return '';
+    if (/^https?:\/\//i.test(value)) return value;
+    if (value.startsWith('/api/v1') && /^https?:\/\//i.test(API_BASE_URL)) {
+      return `${API_BASE_URL}${value.slice('/api/v1'.length)}`;
+    }
+    if (value.startsWith('/')) return value;
+    return new URL(value, window.location.origin).toString();
+  };
+
+  const uploadedPreviewUrl = resolvePreviewUrl(rawPreviewUrl);
 
   useEffect(() => {
     let isCancelled = false;
@@ -66,7 +78,7 @@ export const CertificatePreviewCanvas: React.FC<CertificatePreviewCanvasProps> =
       isCancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [uploadedPreviewUrl]);
+  }, [uploadedPreviewUrl, template.uploadedAt]);
 
   if (previewBlobUrl && !interactive) {
     if (['png', 'jpg', 'jpeg'].includes(fileType)) {
