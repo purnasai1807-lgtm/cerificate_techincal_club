@@ -176,7 +176,7 @@ export function parseCsvTextToJob(csvText: string, filename: string): ImportJob 
     const finalStudentId = studentId;
     const finalRollNumber = rollNumber;
 
-    const eligibility = checkIn && checkOut ? 'ELIGIBLE' : 'NOT_ELIGIBLE';
+    const eligibility = 'PENDING' as const;
 
     return {
       id: `participant_${Date.now()}_${index + 1}`,
@@ -189,12 +189,12 @@ export function parseCsvTextToJob(csvText: string, filename: string): ImportJob 
       checkInTime: checkIn,
       checkOutTime: checkOut,
       eligibility,
-      eligibilityReason: eligibility === 'ELIGIBLE' ? 'Both check-in and check-out timestamps present.' : 'Missing required attendance timestamp.',
-      certificateStatus: eligibility === 'ELIGIBLE' ? 'PENDING' : 'REJECTED',
+      eligibilityReason: 'Awaiting admin eligibility decision.',
+      certificateStatus: 'PENDING',
     };
   });
 
-  const validRecords = records.filter((item) => item.eligibility === 'ELIGIBLE').length;
+  const validRecords = records.filter((item) => item.validationErrors?.length === 0).length;
   const invalidRecords = records.length - validRecords;
 
   return {

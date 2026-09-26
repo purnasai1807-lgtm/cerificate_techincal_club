@@ -63,18 +63,18 @@ export const DashboardPage: React.FC = () => {
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">{settings.eventName}</h1>
             <p className="text-xs sm:text-sm text-purple-200/80 mt-1 max-w-2xl leading-relaxed">
-              Automated attendee attendance verification, high-resolution certificate generation, and
-              tamper-proof verifiable email delivery.
+              Real attendance records, administrator-controlled eligibility decisions, certificate generation, and
+              verifiable email delivery.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              to="/admin/certificates/pending"
+              to="/admin/participants?filter=pending"
               className="px-5 py-2.5 rounded-xl bg-white text-purple-950 hover:bg-purple-50 text-xs font-bold shadow-lg transition-colors flex items-center gap-1.5"
             >
               <Award className="w-4 h-4 text-purple-700" />
-              <span>Review Pending ({pendingCount})</span>
+              <span>Review Eligibility ({pendingCount})</span>
             </Link>
           </div>
         </div>
@@ -115,7 +115,7 @@ export const DashboardPage: React.FC = () => {
             <div className="text-3xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
               {eligibleCount}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">Check-in & out verified</div>
+            <div className="text-[11px] text-slate-400 mt-1">Approved by administrator</div>
           </div>
 
           {/* Not Eligible */}
@@ -130,24 +130,24 @@ export const DashboardPage: React.FC = () => {
             <div className="text-3xl font-extrabold tracking-tight text-rose-600 dark:text-rose-400">
               {notEligibleCount}
             </div>
-            <div className="text-[11px] text-slate-400 mt-1">Incomplete attendance</div>
+            <div className="text-[11px] text-slate-400 mt-1">Rejected by administrator</div>
           </div>
 
-          {/* Pending Approval */}
+          {/* Pending Admin Decision */}
           <div
-            onClick={() => navigate('/admin/certificates/pending')}
+            onClick={() => navigate('/admin/participants?filter=pending')}
             className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-800 shadow-sm hover:shadow-md cursor-pointer transition-all relative overflow-hidden"
           >
             <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/10 rounded-full blur-xl pointer-events-none" />
             <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider">Pending Approval</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">Pending Decision</span>
               <Clock className="w-4 h-4" />
             </div>
             <div className="text-3xl font-extrabold tracking-tight text-purple-600 dark:text-purple-400">
               {pendingCount}
             </div>
             <div className="text-[11px] text-purple-600/80 dark:text-purple-400/80 mt-1 font-medium">
-              Requires coordinator sign-off
+              Requires administrator decision
             </div>
           </div>
 
@@ -253,15 +253,15 @@ export const DashboardPage: React.FC = () => {
           </button>
 
           <button
-            onClick={() => navigate('/admin/certificates/pending')}
+            onClick={() => navigate('/admin/participants?filter=pending')}
             className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-500 text-left transition-all group flex items-start justify-between shadow-sm"
           >
             <div>
               <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                 <FileCheck className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-sm">Review Certificates</h3>
-              <p className="text-xs text-slate-400 mt-0.5">{pendingCount} eligible waiting</p>
+              <h3 className="font-bold text-sm">Review Eligibility</h3>
+              <p className="text-xs text-slate-400 mt-0.5">{pendingCount} participants awaiting decision</p>
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-purple-600 transition-colors" />
           </button>

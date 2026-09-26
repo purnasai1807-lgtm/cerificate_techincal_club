@@ -40,6 +40,8 @@ export const ParticipantsPage: React.FC = () => {
       ? 'ELIGIBLE'
       : searchParams.get('filter') === 'ineligible'
       ? 'NOT_ELIGIBLE'
+      : searchParams.get('filter') === 'pending'
+      ? 'PENDING'
       : 'ALL'
   );
   const [statusFilter, setStatusFilter] = useState<CertificateStatus | 'ALL'>('ALL');
@@ -78,6 +80,21 @@ export const ParticipantsPage: React.FC = () => {
     } else {
       setSortBy(field);
       setSortOrder('asc');
+    }
+  };
+
+  const handleEligibilityDecision = async (p: Participant, decision: 'ELIGIBLE' | 'NOT_ELIGIBLE') => {
+    const label = decision === 'ELIGIBLE' ? 'ELIGIBLE' : 'NOT ELIGIBLE';
+    const confirmed = window.confirm(`Mark ${p.name} as ${label}? This is an administrator decision.`);
+    if (!confirmed) return;
+
+    try {
+      const res = await participantsService.updateEligibility(p.id, decision);
+      if (!res.success) throw new Error(res.message || res.error?.message || 'Failed to update eligibility.');
+      showToast('success', 'Eligibility Updated', `${p.name} is now ${label}.`);
+      await fetchParticipants();
+    } catch (err: any) {
+      showToast('error', 'Eligibility Update Failed', err?.message || 'Could not update eligibility.');
     }
   };
 
@@ -211,7 +228,7 @@ export const ParticipantsPage: React.FC = () => {
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Participant Roster</h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Search, filter, and inspect verified attendance timestamps and credential statuses.
+            Review attendance data and make the final eligibility decision for each participant.
           </p>
         </div>
 
@@ -284,9 +301,10 @@ export const ParticipantsPage: React.FC = () => {
               }}
               className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
-              <option value="ALL">All Eligibility (250)</option>
-              <option value="ELIGIBLE">Eligible Only (220)</option>
-              <option value="NOT_ELIGIBLE">Not Eligible (30)</option>
+              <option value="ALL">All Eligibility</option>
+              <option value="PENDING">Pending Admin Decision</option>
+              <option value="ELIGIBLE">Eligible Only</option>
+              <option value="NOT_ELIGIBLE">Not Eligible</option>
             </select>
           </div>
 
@@ -459,15 +477,33 @@ export const ParticipantsPage: React.FC = () => {
                     <Badge status={p.certificateStatus} />
                   </td>
                   <td className="py-3.5 px-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteParticipant(p)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-900/60 text-[11px] font-semibold transition-colors"
-                      title="Delete participant"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete
-                    </button>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleEligibilityDecision(p, 'ELIGIBLE')}
+                        disabled={p.eligibility === 'ELIGIBLE'}
+                        className="px-2.5 py-1.5 rounded-lg text-emerald-700 hover:text-white hover:bg-emerald-600 border border-emerald-200 dark:border-emerald-900/60 text-[11px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Eligible
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEligibilityDecision(p, 'NOT_ELIGIBLE')}
+                        disabled={p.eligibility === 'NOT_ELIGIBLE'}
+                        className="px-2.5 py-1.5 rounded-lg text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-900/60 text-[11px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Not Eligible
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteParticipant(p)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-900/60 text-[11px] font-semibold transition-colors"
+                        title="Delete participant"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

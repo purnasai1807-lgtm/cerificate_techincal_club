@@ -1,0 +1,8 @@
+Admin eligibility decision flow
+
+- Imported participants start as PENDING.
+- Check-in/check-out data is informational and does not determine eligibility.
+- Admin can mark each participant ELIGIBLE or NOT_ELIGIBLE from Participants.
+- Marking ELIGIBLE creates a pending certificate request.
+- Marking NOT_ELIGIBLE does not create a certificate request.
+- Imported participant records are never discarded because of missing attendance fields.

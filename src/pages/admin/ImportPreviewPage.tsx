@@ -50,7 +50,7 @@ export const ImportPreviewPage: React.FC = () => {
   const [job, setJob] = useState<ImportJob | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCommitting, setIsCommitting] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'ELIGIBLE' | 'NOT_ELIGIBLE'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'ELIGIBLE' | 'NOT_ELIGIBLE'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
   const [page, setPage] = useState(1);
@@ -148,7 +148,7 @@ export const ImportPreviewPage: React.FC = () => {
       const res = await importsService.commitImport(job.id);
       if (res.success) {
         confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
-        showToast('success', 'Import Committed', `${res.data.participantsCreated} participant records saved. ${res.data.certificateRequestsCreated} eligible certificate requests created.`);
+        showToast('success', 'Import Committed', `${res.data.participantsCreated} participant records saved. Eligibility remains pending until an administrator decides.`);
         navigate('/admin/participants');
       } else {
         showToast('error', 'Import Failed', res.error?.message || 'Failed to commit participant records to database.');
@@ -201,7 +201,7 @@ export const ImportPreviewPage: React.FC = () => {
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Import Preview & Validation</h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Review column bindings, attendance eligibility results, and data validation flags.
+            Review imported records. Eligibility is decided manually by an administrator.
           </p>
         </div>
 
@@ -326,39 +326,24 @@ export const ImportPreviewPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 mb-3 text-purple-700 dark:text-purple-300">
               <ShieldAlert className="w-5 h-5 text-purple-600" />
-              <h3 className="font-bold text-base">Active Eligibility Rule</h3>
+              <h3 className="font-bold text-base">Admin Eligibility Decision</h3>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              Default institutional policy requires verified timestamps for{' '}
-              <span className="font-bold text-purple-600 dark:text-purple-400">BOTH Check-in and Check-out</span>.
+              Attendance timestamps are stored as reference data only. The system does <span className="font-bold text-purple-600 dark:text-purple-400">not decide eligibility automatically</span>. An administrator decides whether each participant is eligible.
             </p>
 
-            {/* Visual Example Card */}
-            <div className="mt-4 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 font-mono text-xs">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
-                <span className="text-slate-500 text-[11px]">Rule Condition</span>
-                <span className="text-slate-500 text-[11px]">Outcome</span>
+            <div className="mt-4 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Initial state</span>
+                <Badge status="PENDING" />
               </div>
-              <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
-                <div>
-                  <p>Check-in: ✓ Present</p>
-                  <p>Check-out: ✓ Present</p>
-                </div>
-                <Badge status="ELIGIBLE" />
-              </div>
-              <div className="flex items-center justify-between text-rose-700 dark:text-rose-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-                <div>
-                  <p>Check-in: ✓ Present</p>
-                  <p>Check-out: ✗ Missing</p>
-                </div>
-                <Badge status="NOT_ELIGIBLE" />
-              </div>
+              <p className="text-slate-500 dark:text-slate-400">Every imported participant starts as <strong>Pending Admin Decision</strong>. No certificate request is created until the administrator marks the participant eligible.</p>
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
             <Info className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-            <span>Configurable in Settings before final generation.</span>
+            <span>Eligibility is controlled by the administrator, not by attendance timestamps.</span>
           </div>
         </div>
       </div>
@@ -379,6 +364,16 @@ export const ImportPreviewPage: React.FC = () => {
               All Records ({job.totalRecords})
             </button>
             <button
+              onClick={() => setActiveFilter('PENDING')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                activeFilter === 'PENDING'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              Pending Decision ({job.totalRecords})
+            </button>
+            <button
               onClick={() => setActiveFilter('ELIGIBLE')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
                 activeFilter === 'ELIGIBLE'
@@ -386,7 +381,7 @@ export const ImportPreviewPage: React.FC = () => {
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
               }`}
             >
-              Eligible ({job.validRecords})
+              Eligible ({job.records?.filter((r) => r.eligibility === 'ELIGIBLE').length || 0})
             </button>
             <button
               onClick={() => setActiveFilter('NOT_ELIGIBLE')}
@@ -396,7 +391,7 @@ export const ImportPreviewPage: React.FC = () => {
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
               }`}
             >
-              Not Eligible ({job.invalidRecords})
+              Not Eligible ({job.records?.filter((r) => r.eligibility === 'NOT_ELIGIBLE').length || 0})
             </button>
           </div>
 

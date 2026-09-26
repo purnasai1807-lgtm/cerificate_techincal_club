@@ -59,6 +59,13 @@ export const participantsService = {
   },
 
 
+  async updateEligibility(id: string, eligibility: Exclude<EligibilityStatus, 'PENDING'>): Promise<ApiResponse<Participant>> {
+    return apiClient(`/participants/${id}/eligibility`, {
+      method: 'POST',
+      body: JSON.stringify({ eligibility }),
+    });
+  },
+
   async getAllParticipants(options: Omit<ParticipantFilterOptions, 'page' | 'limit' | 'pageSize'> = {}): Promise<Participant[]> {
     const first = await this.getParticipants({ ...options, page: 1, limit: 100 });
     if (!first.success || !first.data) throw new Error(first.error?.message || 'Failed to load participants.');

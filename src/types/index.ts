@@ -1,4 +1,4 @@
-export type EligibilityStatus = 'ELIGIBLE' | 'NOT_ELIGIBLE';
+export type EligibilityStatus = 'PENDING' | 'ELIGIBLE' | 'NOT_ELIGIBLE';
 
 export type CertificateStatus =
   | 'PENDING'

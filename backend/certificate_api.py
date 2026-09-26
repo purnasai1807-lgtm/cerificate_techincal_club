@@ -263,12 +263,11 @@ def _participant_from_row(row, mapping, index):
         errors.append("MISSING_CHECK_IN")
     if not check_out:
         errors.append("MISSING_CHECK_OUT")
-    eligible = bool(check_in and check_out and not any(e in errors for e in ("MISSING_NAME", "INVALID_EMAIL")))
     return {
         "id": f"part_{uuid.uuid4().hex[:12]}", "name": name, "email": email,
         "studentId": student_id, "rollNumber": roll, "checkIn": check_in or None,
-        "checkOut": check_out or None, "eligibility": "ELIGIBLE" if eligible else "NOT_ELIGIBLE",
-        "eligibilityReason": "Check-in and check-out verified" if eligible else ", ".join(errors),
+        "checkOut": check_out or None, "eligibility": "PENDING",
+        "eligibilityReason": "Awaiting admin eligibility decision",
         "certificateStatus": "PENDING", "validationErrors": errors, "sourceRow": index + 2,
     }
 
@@ -430,7 +429,6 @@ def _validate_job_records(job, mapping=None):
         if (email or roll) and identity in seen:
             duplicates += 1
             record["validationErrors"].append("DUPLICATE_RECORD")
-            record["eligibility"] = "NOT_ELIGIBLE"
         if email or roll:
             seen.add(identity)
     job["records"] = records
@@ -466,7 +464,8 @@ def validate_import(import_id):
     return _response({"status": "VALIDATED", "totalRecords": len(records), "validRecords": job["validRecords"],
                       "invalidRecords": job["invalidRecords"], "duplicateRecords": job["duplicateRecords"],
                       "eligibleRecords": sum(r["eligibility"] == "ELIGIBLE" for r in records),
-                      "ineligibleRecords": sum(r["eligibility"] != "ELIGIBLE" for r in records), "errors": errors})
+                      "ineligibleRecords": sum(r["eligibility"] == "NOT_ELIGIBLE" for r in records),
+                      "pendingRecords": sum(r["eligibility"] == "PENDING" for r in records), "errors": errors})
 
 
 @certificate_api.post("/imports/<import_id>/confirm")
@@ -513,21 +512,10 @@ def confirm_import(import_id):
 
     records = new_records
     portal_state["participants"].extend(records)
-    prefix = portal_state["settings"].get("certificateIdPrefix") or "CERT"
-    active_template = portal_state["settings"].get("activeTemplateId")
+    # Eligibility is a manual admin decision. Importing attendance data never
+    # creates a certificate request automatically. A certificate request is
+    # created only when an administrator explicitly marks a participant eligible.
     created = []
-    for index, participant in enumerate(records, 1):
-        if participant["eligibility"] != "ELIGIBLE":
-            continue
-        certificate_id = f"{prefix}-{len(portal_state['certificates']) + index:05d}"
-        created.append({"id": f"cert_{uuid.uuid4().hex[:12]}", "certificateId": certificate_id,
-                        "participantId": participant["id"], "participantName": participant["name"],
-                        "participantEmail": participant["email"], "participantRollNumber": participant["rollNumber"],
-                        "participantStudentId": participant["studentId"], "checkIn": participant["checkIn"],
-                        "checkOut": participant["checkOut"], "templateId": active_template or "",
-                        "templateName": "", "status": "PENDING", "eventName": portal_state["settings"]["eventName"],
-                        "issueDate": portal_state["settings"]["issueDate"] or _now()[:10]})
-    portal_state["certificates"].extend(created)
     job["status"] = "IMPORTED"
     job["participantsPersisted"] = len(records)
     job["certificateRequestsCreated"] = len(created)
@@ -562,6 +550,66 @@ def participant_detail(participant_id):
         return _error("UNAUTHORIZED", "Authentication required.", 401)
     item = next((p for p in portal_state["participants"] if p["id"] == participant_id), None)
     return _response(item) if item else _error("NOT_FOUND", "Participant not found.", 404)
+
+
+@certificate_api.post("/participants/<participant_id>/eligibility")
+def update_participant_eligibility(participant_id):
+    if not _require_admin():
+        return _error("UNAUTHORIZED", "Authentication required.", 401)
+
+    participant = next((p for p in portal_state["participants"] if p.get("id") == participant_id), None)
+    if not participant:
+        return _error("NOT_FOUND", "Participant not found.", 404)
+
+    body = request.get_json(silent=True) or {}
+    decision = str(body.get("eligibility") or "").strip().upper()
+    if decision not in {"ELIGIBLE", "NOT_ELIGIBLE"}:
+        return _error("INVALID_DECISION", "Eligibility must be ELIGIBLE or NOT_ELIGIBLE.", 422)
+
+    existing = next((c for c in portal_state["certificates"] if c.get("participantId") == participant_id), None)
+    if existing and existing.get("status") not in ("PENDING", "REJECTED"):
+        return _error("INVALID_STATE", "Eligibility cannot be changed after certificate processing has started.", 422)
+
+    participant["eligibility"] = decision
+    participant["eligibilityReason"] = "Approved by administrator" if decision == "ELIGIBLE" else "Rejected by administrator"
+
+    if decision == "NOT_ELIGIBLE":
+        participant["certificateStatus"] = "REJECTED"
+        if existing and existing.get("status") == "PENDING":
+            existing["status"] = "REJECTED"
+            existing["rejectionReason"] = "Participant marked not eligible by administrator."
+            existing["rejectedBy"] = os.getenv("ADMIN_EMAIL", "administrator")
+            existing["rejectedAt"] = _now()
+    else:
+        participant["certificateStatus"] = "PENDING"
+        if not existing:
+            prefix = portal_state["settings"].get("certificateIdPrefix") or "CERT"
+            number = len(portal_state["certificates"]) + 1
+            certificate_id = f"{prefix}-{number:05d}"
+            template_id = portal_state["settings"].get("activeTemplateId") or ""
+            template = next((t for t in portal_state["templates"] if t.get("id") == template_id), None)
+            portal_state["certificates"].append({
+                "id": f"cert_{uuid.uuid4().hex[:12]}",
+                "certificateId": certificate_id,
+                "participantId": participant["id"],
+                "participantName": participant["name"],
+                "participantEmail": participant["email"],
+                "participantRollNumber": participant["rollNumber"],
+                "participantStudentId": participant["studentId"],
+                "checkIn": participant["checkIn"],
+                "checkOut": participant["checkOut"],
+                "templateId": template_id,
+                "templateName": template.get("name", "") if template else "",
+                "status": "PENDING",
+                "eventName": portal_state["settings"].get("eventName", ""),
+                "issueDate": portal_state["settings"].get("issueDate") or _now()[:10],
+            })
+        elif existing.get("status") == "REJECTED":
+            existing.update({"status": "PENDING", "rejectionReason": "", "rejectedBy": "", "rejectedAt": ""})
+
+    _save_state()
+    _audit("ELIGIBILITY_DECISION", participant.get("name", participant_id), details=f"Admin decision: {decision}")
+    return _response(participant, message=f"Participant marked {decision.replace('_', ' ').lower()}.")
 
 
 @certificate_api.delete("/participants/<participant_id>")
@@ -1325,8 +1373,9 @@ def dashboard_stats():
     return _response({
         "participants": len(portal_state["participants"]),
         "eligible": sum(p["eligibility"] == "ELIGIBLE" for p in portal_state["participants"]),
-        "ineligible": sum(p["eligibility"] != "ELIGIBLE" for p in portal_state["participants"]),
-        "pending": sum(c["status"] == "PENDING" for c in certificates),
+        "ineligible": sum(p["eligibility"] == "NOT_ELIGIBLE" for p in portal_state["participants"]),
+        "pending": sum(p.get("eligibility") == "PENDING" for p in portal_state["participants"]),
+        "pendingCertificates": sum(c["status"] == "PENDING" for c in certificates),
         "approved": sum(c["status"] == "APPROVED" for c in certificates),
         "rejected": sum(c["status"] == "REJECTED" for c in certificates),
         "generated": sum(c["status"] == "GENERATED" for c in certificates),
