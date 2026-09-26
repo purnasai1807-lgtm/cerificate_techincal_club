@@ -1,0 +1,13 @@
+Import Preview blank-page fix
+================================
+Root cause:
+ImportPreviewPage.tsx called useSearchParams() but did not import it from react-router-dom.
+That causes a runtime ReferenceError as soon as /admin/import/preview renders.
+
+Fix:
+Changed:
+  import { useNavigate, Link } from 'react-router-dom';
+to:
+  import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+
+No demo records or fake data were added.
