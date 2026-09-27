@@ -32,6 +32,7 @@ export const ParticipantsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkApproving, setIsBulkApproving] = useState(false);
 
   // Filters
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -157,6 +158,36 @@ export const ParticipantsPage: React.FC = () => {
     }
   };
 
+  const handleApproveAll = async () => {
+    if (!totalCount) {
+      showToast('error', 'No Participants', 'There are no participants to approve.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `APPROVE ALL ${totalCount} PARTICIPANTS? This will mark every participant ELIGIBLE and create pending certificate records where needed.`
+    );
+    if (!confirmed) return;
+    const secondConfirmed = window.confirm('Are you absolutely sure? ALL participant records will be marked eligible.');
+    if (!secondConfirmed) return;
+
+    setIsBulkApproving(true);
+    try {
+      const res = await participantsService.bulkEligibility('ELIGIBLE', [], true);
+      if (!res.success) throw new Error(res.message || res.error?.message || 'Failed to approve all participants.');
+      setSelectedIds(new Set());
+      showToast(
+        'success',
+        'All Participants Approved',
+        `${res.data?.participantsUpdated ?? 0} participant(s) were marked eligible.`
+      );
+      await fetchParticipants();
+    } catch (err: any) {
+      showToast('error', 'Approval Failed', err?.message || 'Could not approve all participants.');
+    } finally {
+      setIsBulkApproving(false);
+    }
+  };
+
   const handleDeleteAll = async () => {
     if (!totalCount) {
       showToast('error', 'No Participants', 'There are no participants to delete.');
@@ -262,15 +293,26 @@ export const ParticipantsPage: React.FC = () => {
             Delete Selected {selectedIds.size ? `(${selectedIds.size})` : ''}
           </button>
         </div>
-        <button
-          type="button"
-          onClick={handleDeleteAll}
-          disabled={!totalCount || isBulkDeleting}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-300 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-950/50 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          Delete All ({totalCount})
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleApproveAll}
+            disabled={!totalCount || isBulkDeleting || isBulkApproving}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-300 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <CheckCircle className="w-3.5 h-3.5" />
+            {isBulkApproving ? 'Approving...' : `Approve All (${totalCount})`}
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteAll}
+            disabled={!totalCount || isBulkDeleting || isBulkApproving}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-300 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-950/50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete All ({totalCount})
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}

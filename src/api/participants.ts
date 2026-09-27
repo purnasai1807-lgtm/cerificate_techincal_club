@@ -82,6 +82,13 @@ export const participantsService = {
     return apiClient(`/participants/${id}`);
   },
 
+  async bulkEligibility(eligibility: Exclude<EligibilityStatus, 'PENDING'>, ids: string[] = [], applyAll = false): Promise<ApiResponse<{ updated: boolean; participantsUpdated: number; certificatesCreated: number; skipped: number; applyAll: boolean }>> {
+    return apiClient('/participants/bulk-eligibility', {
+      method: 'POST',
+      body: JSON.stringify({ eligibility, ids, applyAll }),
+    });
+  },
+
   async bulkDeleteParticipants(ids: string[]): Promise<ApiResponse<{ deleted: boolean; participantsDeleted: number; certificatesDeleted: number; emailLogsDeleted: number }>> {
     if (!ids.length) {
       return { success: false, data: { deleted: false, participantsDeleted: 0, certificatesDeleted: 0, emailLogsDeleted: 0 }, message: 'No participants selected.' };

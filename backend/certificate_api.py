@@ -612,6 +612,92 @@ def update_participant_eligibility(participant_id):
     return _response(participant, message=f"Participant marked {decision.replace('_', ' ').lower()}.")
 
 
+@certificate_api.post("/participants/bulk-eligibility")
+def bulk_participant_eligibility():
+    if not _require_admin():
+        return _error("UNAUTHORIZED", "Authentication required.", 401)
+
+    body = request.get_json(silent=True) or {}
+    decision = str(body.get("eligibility") or "").strip().upper()
+    if decision not in {"ELIGIBLE", "NOT_ELIGIBLE"}:
+        return _error("INVALID_DECISION", "Eligibility must be ELIGIBLE or NOT_ELIGIBLE.", 422)
+
+    apply_all = bool(body.get("applyAll"))
+    ids = {str(item) for item in (body.get("ids") or []) if item}
+    if not apply_all and not ids:
+        return _error("NO_SELECTION", "Select participants or choose Apply to All.", 422)
+
+    targets = [p for p in portal_state["participants"] if apply_all or str(p.get("id")) in ids]
+    changed = 0
+    certificates_created = 0
+    skipped = 0
+
+    for participant in targets:
+        participant_id = str(participant.get("id"))
+        existing = next((c for c in portal_state["certificates"] if c.get("participantId") == participant_id), None)
+
+        # Do not overwrite participants whose certificate processing has already started.
+        if existing and existing.get("status") not in ("PENDING", "REJECTED"):
+            skipped += 1
+            continue
+
+        participant["eligibility"] = decision
+        participant["eligibilityReason"] = (
+            "Approved by administrator" if decision == "ELIGIBLE" else "Rejected by administrator"
+        )
+        changed += 1
+
+        if decision == "NOT_ELIGIBLE":
+            participant["certificateStatus"] = "REJECTED"
+            if existing and existing.get("status") == "PENDING":
+                existing["status"] = "REJECTED"
+                existing["rejectionReason"] = "Participant marked not eligible by administrator."
+                existing["rejectedBy"] = os.getenv("ADMIN_EMAIL", "administrator")
+                existing["rejectedAt"] = _now()
+            continue
+
+        participant["certificateStatus"] = "PENDING"
+        if not existing:
+            prefix = portal_state["settings"].get("certificateIdPrefix") or "CERT"
+            number = len(portal_state["certificates"]) + 1
+            certificate_id = f"{prefix}-{number:05d}"
+            template_id = portal_state["settings"].get("activeTemplateId") or ""
+            template = next((t for t in portal_state["templates"] if t.get("id") == template_id), None)
+            portal_state["certificates"].append({
+                "id": f"cert_{uuid.uuid4().hex[:12]}",
+                "certificateId": certificate_id,
+                "participantId": participant["id"],
+                "participantName": participant["name"],
+                "participantEmail": participant["email"],
+                "participantRollNumber": participant["rollNumber"],
+                "participantStudentId": participant["studentId"],
+                "checkIn": participant["checkIn"],
+                "checkOut": participant["checkOut"],
+                "templateId": template_id,
+                "templateName": template.get("name", "") if template else "",
+                "status": "PENDING",
+                "eventName": portal_state["settings"].get("eventName", ""),
+                "issueDate": portal_state["settings"].get("issueDate") or _now()[:10],
+            })
+            certificates_created += 1
+        elif existing.get("status") == "REJECTED":
+            existing.update({"status": "PENDING", "rejectionReason": "", "rejectedBy": "", "rejectedAt": ""})
+
+    _save_state()
+    _audit(
+        "BULK_ELIGIBILITY_DECISION",
+        f"{changed} participant(s)",
+        details=f"Bulk admin decision: {decision}; applyAll={apply_all}; skipped={skipped}",
+    )
+    return _response({
+        "updated": True,
+        "participantsUpdated": changed,
+        "certificatesCreated": certificates_created,
+        "skipped": skipped,
+        "applyAll": apply_all,
+    }, message=f"{changed} participant(s) marked {decision.replace('_', ' ').lower()}.")
+
+
 @certificate_api.delete("/participants/<participant_id>")
 def delete_participant(participant_id):
     if not _require_admin():
