@@ -274,7 +274,7 @@ def _participant_from_row(row, mapping, index):
 
 def _paginate(items):
     page = max(int(request.args.get("page", 1)), 1)
-    limit = min(max(int(request.args.get("limit", 1000)), 1), 1000)
+    limit = min(max(int(request.args.get("limit", 1000)), 1), 5000)
     total = len(items)
     start = (page - 1) * limit
     return {"items": items[start:start + limit], "pagination": {

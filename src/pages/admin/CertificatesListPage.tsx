@@ -450,10 +450,10 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
             className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
             aria-label="Records per page"
           >
-            <option value={25}>25 / page</option>
-            <option value={50}>50 / page</option>
-            <option value={100}>100 / page</option>
             <option value={1000}>All records</option>
+            <option value={100}>100 / page</option>
+            <option value={50}>50 / page</option>
+            <option value={25}>25 / page</option>
           </select>
         </div>
       </div>
