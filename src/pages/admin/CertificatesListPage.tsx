@@ -55,8 +55,8 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(100);
-  const [pagination, setPagination] = useState({ page: 1, limit: 100, total: 0, totalPages: 0 });
+  const [limit, setLimit] = useState(1000);
+  const [pagination, setPagination] = useState({ page: 1, limit: 1000, total: 0, totalPages: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
   // Modals state
@@ -438,7 +438,7 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
                   {selectedIds.length} of {certificates.length} selected
                 </span>
               ) : (
-                `Select all on page (${certificates.length})`
+                `Select all loaded records (${certificates.length})`
               )}
             </span>
           </label>
@@ -453,6 +453,7 @@ export const CertificatesListPage: React.FC<CertificatesListPageProps> = ({ forc
             <option value={25}>25 / page</option>
             <option value={50}>50 / page</option>
             <option value={100}>100 / page</option>
+            <option value={1000}>All records</option>
           </select>
         </div>
       </div>
